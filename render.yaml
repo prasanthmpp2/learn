@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-study-assistant-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AI_STUDY_ENVIRONMENT
+        value: production
+      - key: AI_STUDY_DATA_BACKEND
+        value: firestore
+      - key: AI_STUDY_AUTH_MODE
+        value: firebase

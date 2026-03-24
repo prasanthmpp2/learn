@@ -1,0 +1,12 @@
+{
+  "name": "ai-study-assistant-workspace",
+  "private": true,
+  "scripts": {
+    "dev:online": "powershell -ExecutionPolicy Bypass -File ./scripts/start-online-local.ps1",
+    "dev:offline": "powershell -ExecutionPolicy Bypass -File ./scripts/start-offline.ps1",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:lint": "npm --prefix frontend run lint",
+    "backend:test": "powershell -NoProfile -Command \"Set-Location backend; .\\.venv\\Scripts\\pytest\""
+  }
+}
