@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.core.dependencies import (
   get_chat_service,
@@ -27,6 +30,7 @@ from app.models.schemas import (
 )
 from app.repositories.base import BaseRepository
 from app.services.chat import ChatService
+from app.services.ai import AIServiceError
 
 router = APIRouter()
 
@@ -91,7 +95,30 @@ def ask_question(
   current_user = Depends(get_current_user),
   chat_service: ChatService = Depends(get_chat_service),
 ) -> AskResponse:
-  return chat_service.ask(current_user, payload)
+  try:
+    return chat_service.ask(current_user, payload)
+  except AIServiceError as error:
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+
+
+@router.post('/ask/stream')
+def ask_question_stream(
+  payload: AskRequest,
+  current_user = Depends(get_current_user),
+  chat_service: ChatService = Depends(get_chat_service),
+):
+  def events():
+    try:
+      for event in chat_service.ask_stream(current_user, payload):
+        yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+    except AIServiceError as error:
+      yield f"data: {json.dumps({'type': 'error', 'message': str(error)})}\n\n"
+
+  return StreamingResponse(
+    events(),
+    media_type='text/event-stream',
+    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
+  )
 
 
 @router.get('/ask', response_model=AskResponse)
@@ -102,10 +129,13 @@ def ask_question_via_get(
   current_user = Depends(get_current_user),
   chat_service: ChatService = Depends(get_chat_service),
 ) -> AskResponse:
-  return chat_service.ask(
-    current_user,
-    AskRequest(chat_id=chat_id, message=message, regenerate=regenerate),
-  )
+  try:
+    return chat_service.ask(
+      current_user,
+      AskRequest(chat_id=chat_id, message=message, regenerate=regenerate),
+    )
+  except AIServiceError as error:
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
 
 
 @router.post('/save-note', response_model=NoteResponse)

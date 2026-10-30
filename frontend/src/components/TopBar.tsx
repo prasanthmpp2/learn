@@ -50,7 +50,7 @@ export function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] bg-[rgba(0,0,0,0.88)] px-1 py-4 backdrop-blur-xl sm:px-2">
+    <header className="chat-topbar sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] bg-[rgba(0,0,0,0.88)] px-1 py-4 backdrop-blur-xl sm:px-2">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           className="flex size-10 items-center justify-center rounded-full bg-[rgba(255,255,255,0.04)] text-[color:var(--muted)] transition hover:text-[color:var(--text)] lg:hidden"

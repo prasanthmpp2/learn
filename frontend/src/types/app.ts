@@ -45,6 +45,12 @@ export interface StudyNote {
   createdAt: string
 }
 
+export interface BackendHealth {
+  status: string
+  storage: string
+  ai: string
+}
+
 export interface AskPayload {
   chatId?: string | null
   message: string

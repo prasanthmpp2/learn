@@ -4,6 +4,7 @@ import {
   Copy,
   NotebookTabs,
   RefreshCcw,
+  Sparkles,
   ThumbsDown,
   ThumbsUp,
 } from 'lucide-react'
@@ -12,6 +13,30 @@ import remarkGfm from 'remark-gfm'
 import type { ChatMessage as ChatMessageModel, FeedbackValue } from '../types/app.ts'
 import { cn } from '../utils/cn.ts'
 import { formatClockTime } from '../utils/date.ts'
+
+function normalizeMarkdown(content: string) {
+  const trimmed = content.trim()
+  const unwrapMarkdownFence = (match: string, fence: string, info: string, body: string) => {
+    if (fence.length < 3) return match
+    const language = info.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? ''
+    const markdownFence = ['markdown', 'md', 'text'].includes(language)
+    const containsMarkdown = /^\s{0,3}(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s)/m.test(body)
+    return markdownFence || (!language && containsMarkdown) ? body.trim() : match
+  }
+  const unwrapped = trimmed.replace(
+    /(`{3,}|~{3,})([^\r\n]*)\r?\n([\s\S]*?)\r?\n\1[ \t]*/g,
+    unwrapMarkdownFence,
+  )
+  let insideCodeFence = false
+  const normalizedLines = unwrapped.split(/\r?\n/).map((line) => {
+    if (/^\s*(?:`{3,}|~{3,})/.test(line)) {
+      insideCodeFence = !insideCodeFence
+      return line.trimStart()
+    }
+    return insideCodeFence ? line : line.trimStart()
+  })
+  return normalizedLines.join('\n').trim()
+}
 
 interface ChatMessageProps {
   copiedMessageId: string | null
@@ -33,20 +58,21 @@ export function ChatMessage({
   onSaveNote,
 }: ChatMessageProps) {
   const isAssistant = message.role === 'assistant'
+  const isStreaming = message.id.startsWith('pending-')
 
   return (
     <motion.article
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        'flex w-full items-start gap-3 sm:gap-4',
-        isAssistant ? 'justify-start' : 'justify-end',
+        'message-row flex w-full items-start gap-3 sm:gap-4',
+        isAssistant ? 'message-row--assistant justify-start' : 'message-row--user justify-end',
       )}
       initial={{ opacity: 0, y: 16 }}
       transition={{ duration: 0.24, ease: 'easeOut' }}
     >
       {isAssistant && (
-        <div className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-[rgba(82,246,213,0.14)] text-xs font-semibold text-[color:var(--accent)] sm:size-10 sm:text-sm">
-          AI
+        <div className="message-avatar mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-[rgba(82,246,213,0.14)] text-xs font-semibold text-[color:var(--accent)] sm:size-10 sm:text-sm" aria-label="AI tutor">
+          <Sparkles className="size-4" aria-hidden="true" />
         </div>
       )}
 
@@ -58,19 +84,26 @@ export function ChatMessage({
       >
         <div
           className={cn(
-            'rounded-[26px] border px-4 py-4 sm:rounded-[28px] sm:px-6',
+            'message-card rounded-[26px] border px-4 py-4 sm:rounded-[28px] sm:px-6',
             isAssistant
-              ? 'panel-strong border-[color:var(--line)]'
-              : 'border-transparent text-white shadow-[0_18px_60px_rgba(7,18,32,0.22)]',
+              ? 'message-card--assistant panel-strong border-[color:var(--line)]'
+              : 'message-card--user border-transparent text-white shadow-[0_18px_60px_rgba(7,18,32,0.22)]',
           )}
           style={isAssistant ? undefined : { background: 'var(--user-bubble)' }}
         >
           {isAssistant ? (
-            <div className="markdown-content text-sm sm:text-[15px]">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content}
-              </ReactMarkdown>
-            </div>
+            <>
+              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-[color:var(--muted)]">
+                <Sparkles className="size-3.5 text-[color:var(--accent)]" aria-hidden="true" />
+                <span>Study assistant</span>
+                <span className="rounded-full border border-[color:var(--line)] px-2 py-0.5 text-[10px] font-normal">{isStreaming ? 'Writing' : 'Answer'}</span>
+              </div>
+              <div className="markdown-content text-sm sm:text-[15px]">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {normalizeMarkdown(message.content)}
+                </ReactMarkdown>
+              </div>
+            </>
           ) : (
             <p className="whitespace-pre-wrap text-sm leading-7 sm:text-[15px]">
               {message.content}
@@ -80,13 +113,13 @@ export function ChatMessage({
 
         <div
           className={cn(
-            'mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted)]',
+            'message-actions mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted)]',
             isAssistant ? 'justify-start pl-1' : 'justify-end pr-1',
           )}
         >
           <span>{formatClockTime(message.createdAt)}</span>
 
-          {isAssistant && (
+          {isAssistant && !isStreaming && (
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 className="rounded-full border border-[color:var(--line)] p-2 transition hover:border-[color:var(--line-strong)] hover:bg-white/5"

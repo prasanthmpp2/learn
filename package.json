@@ -2,6 +2,7 @@
   "name": "ai-study-assistant-workspace",
   "private": true,
   "scripts": {
+    "dev": "npm run dev:online",
     "dev:online": "powershell -ExecutionPolicy Bypass -File ./scripts/start-online-local.ps1",
     "dev:offline": "powershell -ExecutionPolicy Bypass -File ./scripts/start-offline.ps1",
     "frontend:dev": "npm --prefix frontend run dev",

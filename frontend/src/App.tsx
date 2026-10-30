@@ -4,6 +4,7 @@ import { AppLayout } from './layouts/AppLayout.tsx'
 import { AuthPage } from './pages/AuthPage.tsx'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { NotesPage } from './pages/NotesPage.tsx'
+import { ProfilePage } from './pages/ProfilePage.tsx'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="chats" element={<ChatPage />} />
           <Route path="chats/:chatId" element={<ChatPage />} />
           <Route path="notes" element={<NotesPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/chats" replace />} />

@@ -49,6 +49,7 @@ export function ChatPage() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [currentChat, setCurrentChat] = useState<ChatSession | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [failedRequest, setFailedRequest] = useState<{ message: string; regenerate: boolean } | null>(null)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [messages, setMessages] = useState<ChatMessageModel[]>([])
@@ -69,6 +70,7 @@ export function ChatPage() {
 
   useEffect(() => {
     if (!chatId) {
+      setIsLoadingMessages(false)
       setMessages([])
       setCurrentChat(null)
       setError(null)
@@ -120,11 +122,27 @@ export function ChatPage() {
   const sendMessage = async (message: string, regenerate = false) => {
     setIsSending(true)
     setError(null)
+    setFailedRequest(null)
     abortControllerRef.current = new AbortController()
+
+    if (!regenerate) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `pending-${Date.now()}`,
+          chatId: chatId ?? '',
+          userId: user?.uid ?? '',
+          role: 'user',
+          content: message,
+          createdAt: new Date().toISOString(),
+        },
+      ])
+    }
 
     try {
       const auth = await buildAuth()
-      const response = await api.ask(
+      let streamedAnswer = ''
+      const response = await api.askStream(
         auth,
         {
           chatId: chatId ?? null,
@@ -137,6 +155,20 @@ export function ChatPage() {
           regenerate,
         },
         abortControllerRef.current.signal,
+        (chunk) => {
+          streamedAnswer += chunk
+          setMessages((current) => [
+            ...current.filter((item) => item.id !== 'pending-assistant'),
+            {
+              id: 'pending-assistant',
+              chatId: chatId ?? '',
+              userId: user?.uid ?? '',
+              role: 'assistant',
+              content: streamedAnswer,
+              createdAt: new Date().toISOString(),
+            },
+          ])
+        },
       )
 
       setMessages(response.messages)
@@ -148,8 +180,12 @@ export function ChatPage() {
         navigate(`/chats/${response.chat.id}`, { replace: !chatId })
       }
     } catch (sendError) {
-      if ((sendError as Error).name !== 'AbortError') {
+      if ((sendError as Error).name === 'AbortError') {
+        setMessages((current) => current.filter((item) => !item.id.startsWith('pending-')))
+      } else {
+        setMessages((current) => current.filter((item) => item.id !== 'pending-assistant'))
         setError(sendError instanceof Error ? sendError.message : 'Could not send your message.')
+        setFailedRequest({ message, regenerate })
       }
     } finally {
       setIsSending(false)
@@ -170,6 +206,18 @@ export function ChatPage() {
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     setIsSending(false)
+  }
+
+  const retryFailedRequest = async () => {
+    if (!failedRequest) {
+      return
+    }
+
+    setMessages((current) => current.filter((item) => !item.id.startsWith('pending-')))
+    setError(null)
+    const request = failedRequest
+    setFailedRequest(null)
+    await sendMessage(request.message, request.regenerate)
   }
 
   const handleCopy = async (content: string, messageId: string) => {
@@ -227,8 +275,8 @@ export function ChatPage() {
   ]
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="mx-auto w-full max-w-5xl shrink-0">
+    <div className="chat-page flex h-full min-h-0 flex-col gap-4">
+      <div className="chat-topbar-wrap mx-auto w-full max-w-5xl shrink-0">
         <TopBar
           chat={currentChat}
           onDeleteChat={async () => {
@@ -252,30 +300,36 @@ export function ChatPage() {
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto" ref={scrollRef}>
+      <div className="chat-transcript min-h-0 flex-1 overflow-y-auto" ref={scrollRef}>
         {isLoadingMessages ? (
-          <div className="mx-auto w-full max-w-5xl space-y-4 px-1 pb-4 pt-4 sm:px-2 sm:pb-6">
-            <TypingPlaceholder />
-            <TypingPlaceholder />
+          <div className="chat-transcript-inner mx-auto flex w-full max-w-5xl flex-col gap-4 px-1 pb-4 pt-4 sm:px-2 sm:pb-6" role="status" aria-live="polite">
+            <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel)] px-4 py-3 text-sm text-[color:var(--muted)]">
+              Loading saved conversation…
+            </div>
+            <div className="typing-skeleton w-4/5" aria-hidden="true" />
+            <div className="typing-skeleton w-3/5" aria-hidden="true" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="mx-auto flex max-w-3xl flex-col items-center justify-center px-1 py-12 text-center sm:px-2">
-            <div className="flex size-16 items-center justify-center rounded-[24px] bg-[linear-gradient(135deg,var(--accent),var(--sun))] text-slate-950 shadow-[0_20px_60px_rgba(82,246,213,0.22)]">
+          <div className="chat-empty-state mx-auto flex max-w-4xl flex-col items-center justify-center px-1 py-12 text-center sm:px-2">
+            <div className="chat-empty-mark flex size-16 items-center justify-center rounded-[24px] bg-[linear-gradient(135deg,var(--accent),var(--sun))] text-slate-950 shadow-[0_20px_60px_rgba(82,246,213,0.22)]">
               <Sparkles className="size-7" />
             </div>
-            <h2 className="mt-6 text-3xl font-semibold tracking-[-0.05em] text-[color:var(--text)]">
-              Study with a context-aware AI workspace
+            <p className="mt-6 rounded-full border border-[color:var(--line)] bg-[color:var(--panel)] px-3 py-1.5 text-xs font-medium text-[color:var(--accent)]">
+              Your study session is ready
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-[color:var(--text)] sm:text-4xl">
+              What are you learning today?
             </h2>
             <p className="mt-4 max-w-2xl text-sm leading-8 text-[color:var(--muted)] sm:text-base">
-              Ask a new question, upload lecture text, or pull a saved note into this chat.
-              Answers are structured to be easy to revise later.
+              Ask for a clear explanation, turn class notes into a revision guide, or practise with a quiz.
+              Your chats and saved notes stay in your workspace.
             </p>
 
             <div className="mt-8 grid w-full gap-3 text-left sm:grid-cols-3">
               {suggestions.map((suggestion) => (
                 <motion.button
                   key={suggestion}
-                  className="rounded-[24px] bg-[rgba(255,255,255,0.04)] p-4 text-sm leading-7 text-[color:var(--text)] transition hover:bg-[rgba(255,255,255,0.07)]"
+                  className="suggestion-card rounded-[20px] p-4 text-sm leading-7 text-[color:var(--text)] transition"
                   onClick={() => setComposerValue(suggestion)}
                   type="button"
                   whileHover={{ y: -3 }}
@@ -287,7 +341,7 @@ export function ChatPage() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-1 pb-4 pt-4 sm:px-2 sm:pb-6">
+          <div className="chat-transcript-inner mx-auto flex w-full max-w-5xl flex-col gap-6 px-1 pb-4 pt-4 sm:px-2 sm:pb-6">
             {messages.map((message) => (
               <ChatMessage
                 copiedMessageId={copiedMessageId}
@@ -306,14 +360,23 @@ export function ChatPage() {
       </div>
 
       {error && (
-        <div className="mx-auto w-full max-w-5xl rounded-2xl bg-[rgba(255,181,155,0.1)] px-4 py-3 text-sm text-[#ffc9b7]">
-          {error}
+        <div className="chat-error mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 text-sm" role="alert">
+          <span className="min-w-0 leading-6">{error}</span>
+          {failedRequest && (
+            <button
+              className="shrink-0 rounded-xl border border-current/20 px-3 py-2 font-medium transition hover:bg-white/8"
+              onClick={() => void retryFailedRequest()}
+              type="button"
+            >
+              Try again
+            </button>
+          )}
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-5xl shrink-0">
+      <div className="chat-composer-wrap mx-auto w-full max-w-5xl shrink-0">
         <ChatComposer
-          disabled={!user}
+          disabled={!user || isSending}
           isSending={isSending}
           notes={notes}
           onChange={setComposerValue}

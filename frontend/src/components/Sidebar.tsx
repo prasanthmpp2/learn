@@ -9,6 +9,7 @@ import {
   Search,
   Settings2,
   SunMedium,
+  UserRound,
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
@@ -59,7 +60,7 @@ export function Sidebar({
   const [profileOpen, setProfileOpen] = useState(false)
 
   const content = (
-    <aside className="panel-surface flex h-full w-full max-w-[19rem] flex-col overflow-hidden border-r border-[color:var(--line)] px-4 py-5 lg:sticky lg:top-0 lg:h-screen sm:px-5">
+    <aside className="app-sidebar panel-surface flex h-full w-full max-w-[19rem] flex-col overflow-hidden border-r border-[color:var(--line)] px-4 py-5 lg:sticky lg:top-0 lg:h-screen sm:px-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.32em] text-[color:var(--muted)]">
@@ -187,6 +188,22 @@ export function Sidebar({
               exit={{ opacity: 0, height: 0 }}
               initial={{ opacity: 0, height: 0 }}
             >
+              <div className="rounded-2xl border border-[color:var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Signed in account</p>
+                <p className="mt-2 truncate text-sm font-semibold text-[color:var(--text)]">{profile.displayName || 'Student'}</p>
+                <p className="mt-1 break-all text-xs leading-5 text-[color:var(--muted)]">{profile.email}</p>
+              </div>
+              <NavLink
+                className={({ isActive }) => cn(
+                  'flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-sm transition hover:bg-[rgba(255,255,255,0.04)]',
+                  isActive ? 'text-[color:var(--accent)]' : 'text-[color:var(--text)]',
+                )}
+                onClick={onCloseMobile}
+                to="/profile"
+              >
+                <UserRound className="size-4" />
+                Profile
+              </NavLink>
               <button
                 className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm text-[color:var(--text)] transition hover:bg-[rgba(255,255,255,0.04)]"
                 onClick={onThemeToggle}

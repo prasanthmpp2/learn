@@ -107,7 +107,7 @@ export function ChatComposer({
   }
 
   return (
-    <div className="rounded-[28px] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.96))] px-3 pb-3 pt-4 backdrop-blur-xl sm:px-4">
+    <div className="chat-composer rounded-[28px] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.96))] px-3 pb-3 pt-4 backdrop-blur-xl sm:px-4">
       <div className="flex items-end gap-3">
         <div className="relative">
           <button
@@ -169,6 +169,7 @@ export function ChatComposer({
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Ask a concept, paste notes, or continue a study thread..."
+            aria-label="Ask a study question"
             ref={textareaRef}
             rows={1}
             value={value}
@@ -185,7 +186,8 @@ export function ChatComposer({
                 className="flex size-10 items-center justify-center rounded-full bg-[rgba(255,255,255,0.05)] text-[color:var(--text)] transition hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!isSupported}
                 onClick={handleMicClick}
-                title={isSupported ? 'Voice input' : 'Voice input not supported'}
+                title={isListening ? 'Stop voice input' : isSupported ? 'Voice input' : 'Voice input not supported'}
+                aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
                 type="button"
               >
                 <Mic
@@ -197,6 +199,8 @@ export function ChatComposer({
                 <button
                   className="flex size-11 items-center justify-center rounded-full bg-[rgba(240,193,94,0.16)] text-[color:var(--sun)] transition hover:brightness-110"
                   onClick={onStop}
+                  aria-label="Stop generating answer"
+                  title="Stop generating answer"
                   type="button"
                 >
                   <Square className="size-4 fill-current" />
@@ -206,6 +210,8 @@ export function ChatComposer({
                   className="flex size-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--accent),var(--sun))] text-slate-950 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={disabled || !value.trim()}
                   onClick={onSend}
+                  aria-label="Send question"
+                  title="Send question"
                   type="button"
                 >
                   <SendHorizonal className="size-4" />

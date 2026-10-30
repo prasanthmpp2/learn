@@ -16,3 +16,4 @@ backend/app/services/__pycache__
 .env
 backend/.env
 frontend/.env
+backend/serviceAccountKey.json

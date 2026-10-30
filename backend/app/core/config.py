@@ -19,7 +19,15 @@ class Settings(BaseSettings):
   data_backend: Literal['memory', 'firestore'] = 'memory'
   auth_mode: Literal['auto', 'demo', 'firebase'] = 'auto'
   gemini_api_key: str | None = None
-  gemini_model: str = 'gemini-2.5-flash'
+  gemini_model: str = 'gemini-3.5-flash-lite'
+  gemini_fallback_models: list[str] = Field(
+    default_factory=lambda: ['gemini-3.6-flash', 'gemini-3.8-flash']
+  )
+  gemini_timeout_seconds: int = 25
+  # Groq is used when Gemini cannot answer the request.
+  groq_api_key: str | None = None
+  groq_model: str = 'openai/gpt-oss-20b'
+  groq_timeout_seconds: int = 15
   firebase_project_id: str | None = None
   firebase_client_email: str | None = None
   firebase_private_key: str | None = None
@@ -46,6 +54,13 @@ class Settings(BaseSettings):
 
       return [origin.strip() for origin in stripped.split(',') if origin.strip()]
 
+    return value
+
+  @field_validator('gemini_fallback_models', mode='before')
+  @classmethod
+  def validate_gemini_fallback_models(cls, value: list[str] | str) -> list[str]:
+    if isinstance(value, str):
+      return [model.strip() for model in value.split(',') if model.strip()]
     return value
 
   @property

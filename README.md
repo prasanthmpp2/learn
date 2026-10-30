@@ -50,55 +50,70 @@ learn/
 └─ README.md
 ```
 
+## Run locally in two terminals (Windows PowerShell)
+
+Open two PowerShell terminals at the project root (`Project\learn`). Start the frontend in Terminal 1:
+
+```powershell
+Set-Location .\frontend
+npm.cmd install
+npm.cmd run dev -- --host 127.0.0.1 --port 5173
+```
+
+Start the API in Terminal 2:
+
+```powershell
+Set-Location .\backend
+# Run this once if the .venv folder does not exist yet:
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Keep both terminals open. Visit `http://127.0.0.1:5173`; the frontend forwards `/api` requests to the backend on port `8000`. Use `Ctrl+C` in each terminal to stop its service. If port `8000` is already occupied, stop the old backend before starting another one. The root command `npm.cmd run dev` starts the connected/local setup in two new PowerShell windows; `npm.cmd run dev:offline` starts the demo setup.
+
 ## Frontend setup
 
 1. Copy `frontend/.env.example` to `frontend/.env`.
-2. Fill in Firebase web app values and the backend base URL.
-3. Install and run:
+2. Keep the Firebase project values set to your Firebase Web app, and make sure `VITE_API_BASE_URL=/api` and `VITE_API_PROXY_TARGET=http://127.0.0.1:8000` for local development.
+3. Install frontend dependencies in the `frontend` folder, then run the frontend in Terminal 1 as shown above.
 
-```bash
-cd frontend
-npm install
-npm run dev
+```powershell
+Set-Location .\frontend
+npm.cmd install
+npm.cmd run dev -- --host 127.0.0.1 --port 5173
 ```
 
 If chat requests show `Failed to fetch` in local development:
 
 - make sure the FastAPI backend is running on `http://127.0.0.1:8000`
-- or use the included PowerShell helpers in [scripts/start-online-local.ps1](c:/Users/Public/Documents/learn/scripts/start-online-local.ps1) or [scripts/start-offline.ps1](c:/Users/Public/Documents/learn/scripts/start-offline.ps1)
+- or use the included PowerShell helpers in [scripts/start-online-local.ps1](scripts/start-online-local.ps1) or [scripts/start-offline.ps1](scripts/start-offline.ps1)
 - Vite now proxies `/api` to `http://127.0.0.1:8000` by default, so local frontend requests can work without cross-origin issues
 
-You can also start everything from the repo root with:
+You can also start both services from the repo root in separate PowerShell windows with:
 
-```bash
-npm run dev:online
+```powershell
+npm.cmd run dev
 ```
 
-or
-
-```bash
-npm run dev:offline
-```
+This is an alias for `npm.cmd run dev:online`. For demo mode, use `npm.cmd run dev:offline`.
 
 ## Backend setup
 
-1. Copy `backend/.env.example` to `backend/.env`.
-2. For local demo mode, you can leave Firebase and Gemini keys empty.
-3. Create a virtual environment, install dependencies, and run the API:
+1. Copy `backend/.env.example` to `backend/.env` for connected mode, then set `AI_STUDY_GEMINI_API_KEY`, `AI_STUDY_GROQ_API_KEY`, and the Firebase Admin credential path. Keep `AI_STUDY_FIREBASE_PROJECT_ID` the same as the frontend Firebase project.
 
-```bash
-cd backend
+Gemini is tried first (`gemini-3.5-flash-lite`, with Gemini 3.6 Flash and 3.8 Flash fallbacks). If Gemini fails, the backend tries Groq (`openai/gpt-oss-20b`). If neither provider accepts the request, the chat shows a provider-specific error. After changing API keys or models, restart the backend terminal so it reloads `backend/.env`.
+2. For offline/demo mode instead, copy `backend/.env.offline.example` and use `frontend/.env.offline.example`; the offline launcher also applies these settings for its session.
+3. Create the backend virtual environment, install dependencies, and run the API in Terminal 2 as shown above.
+
+```powershell
+Set-Location .\backend
 py -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
-.\.venv\Scripts\uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-The default local mode uses:
-
-- `AI_STUDY_DATA_BACKEND=memory`
-- `AI_STUDY_AUTH_MODE=auto`
-
-That lets the frontend work in demo mode without cloud setup. For production, switch to:
+The connected local setup uses the values in `backend/.env` (Firestore and Firebase Auth when configured). The offline launcher uses demo auth and in-memory storage. For production, configure:
 
 - `AI_STUDY_DATA_BACKEND=firestore`
 - real Firebase Admin credentials
@@ -108,7 +123,7 @@ For local Firebase Admin setup on Windows, `AI_STUDY_FIREBASE_CREDENTIALS_PATH` 
 
 ## Offline and online local hosting
 
-Use the included PowerShell helpers from [scripts/start-offline.ps1](c:/Users/Public/Documents/learn/scripts/start-offline.ps1) and [scripts/start-online-local.ps1](c:/Users/Public/Documents/learn/scripts/start-online-local.ps1).
+Use the included PowerShell helpers from [scripts/start-offline.ps1](scripts/start-offline.ps1) and [scripts/start-online-local.ps1](scripts/start-online-local.ps1).
 
 - Offline/demo mode:
   - backend runs with demo auth, memory storage, and offline AI fallback
@@ -118,23 +133,23 @@ Use the included PowerShell helpers from [scripts/start-offline.ps1](c:/Users/Pu
   - frontend uses `frontend/.env`
   - Firebase and Firestore are used when configured
 
-If you prefer manual env files instead of the scripts, use [frontend/.env.offline.example](c:/Users/Public/Documents/learn/frontend/.env.offline.example) and [backend/.env.offline.example](c:/Users/Public/Documents/learn/backend/.env.offline.example) as the offline/demo templates.
+If you prefer manual env files instead of the scripts, use [frontend/.env.offline.example](frontend/.env.offline.example) and [backend/.env.offline.example](backend/.env.offline.example) as the offline/demo templates.
 
 ## Hosting options
 
 ### Offline / local hosting
 
-- Use [scripts/start-offline.ps1](c:/Users/Public/Documents/learn/scripts/start-offline.ps1) for a fully local demo flow
-- Or run `npm run dev:offline` from [package.json](c:/Users/Public/Documents/learn/package.json)
+- Use [scripts/start-offline.ps1](scripts/start-offline.ps1) for a fully local demo flow
+- Or run `npm.cmd run dev:offline` from [package.json](package.json)
 
 ### Online / cloud hosting
 
 - Frontend:
   - Vercel or Netlify
-  - SPA rewrites are included in [frontend/vercel.json](c:/Users/Public/Documents/learn/frontend/vercel.json) and [frontend/public/_redirects](c:/Users/Public/Documents/learn/frontend/public/_redirects)
+  - SPA rewrites are included in [frontend/vercel.json](frontend/vercel.json) and [frontend/public/_redirects](frontend/public/_redirects)
 - Backend:
   - Render or Railway
-  - A Render starter config is included in [render.yaml](c:/Users/Public/Documents/learn/render.yaml)
+  - A Render starter config is included in [render.yaml](render.yaml)
 
 For online hosting, set your real Firebase and Gemini environment variables in the platform dashboard.
 

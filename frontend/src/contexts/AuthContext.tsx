@@ -6,23 +6,33 @@ import {
 } from 'react'
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
 } from 'firebase/auth'
-import { firebaseAuth, firebaseConfigured, googleProvider } from '../utils/firebase.ts'
+import {
+  firebaseAuth,
+  firebaseConfigured,
+  firebaseSetupMessage,
+  googleProvider,
+} from '../utils/firebase.ts'
 import type { AuthUser } from '../types/app.ts'
 
 interface AuthContextValue {
+  authSetupMessage: string | null
   demoMode: boolean
   getToken: () => Promise<string | null>
+  googleAuthAvailable: boolean
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
-  signup: (email: string, password: string) => Promise<void>
+  signup: (email: string, password: string, displayName: string) => Promise<void>
+  updateDisplayName: (displayName: string) => Promise<void>
   user: AuthUser | null
 }
 
@@ -83,8 +93,76 @@ function mapFirebaseUser(user: {
   }
 }
 
+function getAuthErrorCode(error: unknown) {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && typeof (error as { code: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code
+  }
+
+  return null
+}
+
+function formatAuthError(error: unknown, action: 'login' | 'signup' | 'google') {
+  const code = getAuthErrorCode(error)
+
+  switch (code) {
+    case 'auth/account-exists-with-different-credential':
+      return new Error('This email already uses a different sign-in method. Try the original provider first.')
+    case 'auth/cancelled-popup-request':
+      return new Error('Google sign-in is already opening in another window. Please finish that flow first.')
+    case 'auth/configuration-not-found':
+    case 'auth/operation-not-allowed':
+      return new Error('Enable Google sign-in in Firebase Authentication before using this button.')
+    case 'auth/email-already-in-use':
+      return new Error('This email is already in use. Try logging in instead.')
+    case 'auth/invalid-credential':
+      return new Error(action === 'google'
+        ? 'Google sign-in did not return a valid credential. Check your Firebase app settings and try again.'
+        : 'The email or password is incorrect.')
+    case 'auth/invalid-email':
+      return new Error('Enter a valid email address.')
+    case 'auth/operation-not-supported-in-this-environment':
+      return new Error('Google sign-in is not supported in this browser environment. Try a normal browser tab.')
+    case 'auth/popup-blocked':
+      return new Error('The browser blocked the Google popup. Allow popups for this site and try again.')
+    case 'auth/popup-closed-by-user':
+      return new Error('The Google sign-in window was closed before completion.')
+    case 'auth/too-many-requests':
+      return new Error('Too many sign-in attempts were made. Please wait a moment and try again.')
+    case 'auth/unauthorized-domain':
+      return new Error('This domain is not allowed in Firebase Authentication. Add it to your Firebase authorized domains.')
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return new Error('The email or password is incorrect.')
+    case 'auth/weak-password':
+      return new Error('Choose a stronger password with at least 6 characters.')
+    default:
+      if (error instanceof Error && error.message) {
+        return new Error(error.message)
+      }
+
+      return new Error(
+        action === 'signup'
+          ? 'Could not create your account right now.'
+          : action === 'google'
+            ? 'Google sign-in is unavailable at the moment.'
+            : 'Invalid credentials. Please try again.',
+      )
+  }
+}
+
+function shouldUseRedirectForGoogle(error: unknown) {
+  const code = getAuthErrorCode(error)
+  return code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment'
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const isDemoMode = !firebaseConfigured || !firebaseAuth
+  const googleAuthAvailable = Boolean(firebaseConfigured && firebaseAuth && googleProvider)
   const [user, setUser] = useState<AuthUser | null>(() =>
     isDemoMode ? readStoredDemoUser() : null,
   )
@@ -92,15 +170,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (isDemoMode || !firebaseAuth) {
+      setLoading(false)
       return
     }
 
+    let active = true
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
+      if (!active) {
+        return
+      }
+
       setUser(nextUser ? mapFirebaseUser(nextUser) : null)
       setLoading(false)
     })
 
-    return unsubscribe
+    void getRedirectResult(firebaseAuth).catch((error) => {
+      if (!active) {
+        return
+      }
+
+      console.error('Failed to finish the Google redirect flow.', error)
+      setLoading(false)
+    })
+
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [isDemoMode])
 
   const login = async (email: string, password: string) => {
@@ -111,33 +207,75 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return
     }
 
-    await signInWithEmailAndPassword(firebaseAuth, email, password)
+    try {
+      await signInWithEmailAndPassword(firebaseAuth, email, password)
+    } catch (error) {
+      throw formatAuthError(error, 'login')
+    }
   }
 
-  const signup = async (email: string, password: string) => {
+  const signup = async (email: string, password: string, requestedName: string) => {
+    const displayName = requestedName.trim() || displayNameFromEmail(email)
     if (!firebaseConfigured || !firebaseAuth) {
-      const demoUser = buildDemoUser(email)
+      const demoUser = { ...buildDemoUser(email), displayName }
       persistDemoUser(demoUser)
       setUser(demoUser)
       return
     }
 
-    const credentials = await createUserWithEmailAndPassword(firebaseAuth, email, password)
-    const displayName = displayNameFromEmail(email)
-    await updateProfile(credentials.user, { displayName })
-    setUser(mapFirebaseUser({ ...credentials.user, displayName }))
+    try {
+      const credentials = await createUserWithEmailAndPassword(firebaseAuth, email, password)
+      await updateProfile(credentials.user, { displayName })
+      setUser(mapFirebaseUser({ ...credentials.user, displayName }))
+    } catch (error) {
+      throw formatAuthError(error, 'signup')
+    }
+  }
+
+  const updateDisplayName = async (requestedName: string) => {
+    const displayName = requestedName.trim()
+    if (!displayName) {
+      throw new Error('Enter your name before saving.')
+    }
+
+    if (isDemoMode || !firebaseAuth) {
+      if (!user) return
+      const updatedUser = { ...user, displayName }
+      persistDemoUser(updatedUser)
+      setUser(updatedUser)
+      return
+    }
+
+    const currentUser = firebaseAuth.currentUser
+    if (!currentUser) {
+      throw new Error('Your sign-in session expired. Please sign in again.')
+    }
+
+    try {
+      await updateProfile(currentUser, { displayName })
+      await currentUser.getIdToken(true)
+      setUser(mapFirebaseUser(currentUser))
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Could not update your profile name.')
+    }
   }
 
   const loginWithGoogle = async () => {
     if (!firebaseConfigured || !firebaseAuth || !googleProvider) {
-      const demoUser = buildDemoUser('student@demo.ai')
-      persistDemoUser(demoUser)
-      setUser(demoUser)
-      return
+      throw new Error(firebaseSetupMessage ?? 'Google sign-in requires Firebase configuration.')
     }
 
-    const credentials = await signInWithPopup(firebaseAuth, googleProvider)
-    setUser(mapFirebaseUser(credentials.user))
+    try {
+      const credentials = await signInWithPopup(firebaseAuth, googleProvider)
+      setUser(mapFirebaseUser(credentials.user))
+    } catch (error) {
+      if (shouldUseRedirectForGoogle(error)) {
+        await signInWithRedirect(firebaseAuth, googleProvider)
+        return
+      }
+
+      throw formatAuthError(error, 'google')
+    }
   }
 
   const logout = async () => {
@@ -161,13 +299,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
+        authSetupMessage: firebaseSetupMessage,
         demoMode: isDemoMode,
         getToken,
+        googleAuthAvailable,
         loading,
         login,
         loginWithGoogle,
         logout,
         signup,
+        updateDisplayName,
         user,
       }}
     >
