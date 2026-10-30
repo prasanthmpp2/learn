@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+frontend/node_modules
+frontend/dist
+backend/.venv
+backend/__pycache__
+backend/**/*.pyc
+backend/.env
+backend/serviceAccountKey.json
+frontend/.env
+frontend/.env.local
+*.log

@@ -14,6 +14,7 @@ Start-Process powershell -ArgumentList @(
   '$env:AI_STUDY_AUTH_MODE=''demo''; ' +
   '$env:AI_STUDY_DATA_BACKEND=''memory''; ' +
   '$env:AI_STUDY_GEMINI_API_KEY=''''; ' +
+  '$env:AI_STUDY_GROQ_API_KEY=''''; ' +
   '.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload'
 )
 
@@ -22,6 +23,7 @@ Start-Process powershell -ArgumentList @(
   '-Command',
   "Set-Location '$frontendPath'; " +
   '$env:VITE_API_BASE_URL=''http://127.0.0.1:8000/api''; ' +
+  '$env:VITE_API_PROXY_TARGET=''http://127.0.0.1:8000''; ' +
   '$env:VITE_FIREBASE_API_KEY=''''; ' +
   '$env:VITE_FIREBASE_AUTH_DOMAIN=''''; ' +
   '$env:VITE_FIREBASE_PROJECT_ID=''''; ' +

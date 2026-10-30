@@ -1,14 +1,47 @@
 services:
   - type: web
-    name: ai-study-assistant-api
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    name: ai-study-assistant
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
     envVars:
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        value: ai-study-assistant-26.firebaseapp.com
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: ai-study-assistant-26
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        value: ai-study-assistant-26.firebasestorage.app
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        value: "775162780114"
+      - key: VITE_FIREBASE_APP_ID
+        value: 1:775162780114:web:6afb9399c86e4152dbd00b
+      - key: VITE_FIREBASE_MEASUREMENT_ID
+        value: G-5EXP87JRNJ
       - key: AI_STUDY_ENVIRONMENT
         value: production
       - key: AI_STUDY_DATA_BACKEND
         value: firestore
       - key: AI_STUDY_AUTH_MODE
         value: firebase
+      - key: AI_STUDY_FIREBASE_PROJECT_ID
+        value: ai-study-assistant-26
+      - key: AI_STUDY_FIREBASE_STORAGE_BUCKET
+        value: ai-study-assistant-26.firebasestorage.app
+      - key: AI_STUDY_FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: AI_STUDY_FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: AI_STUDY_GEMINI_API_KEY
+        sync: false
+      - key: AI_STUDY_GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: AI_STUDY_GEMINI_FALLBACK_MODELS
+        value: gemini-3.6-flash,gemini-3.8-flash
+      - key: AI_STUDY_GROQ_API_KEY
+        sync: false
+      - key: AI_STUDY_GROQ_MODEL
+        value: openai/gpt-oss-20b
